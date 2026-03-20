@@ -1,42 +1,50 @@
 <template>
-  <div class="app">
-    <header class="top-nav">
-      <div class="nav-container">
-        <div class="logo">
-          <h1>{{ t('nav.companyName') }}</h1>
-          <span class="subtitle">{{ t('nav.subtitle') }}</span>
+  <div class="app-shell">
+    <aside class="sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <div class="logo-mark">F</div>
+          <span class="logo-text">{{ t('nav.companyName') }}</span>
         </div>
-        <nav class="nav-tabs">
-          <router-link to="/" :class="{ active: $route.path === '/' }">
-            {{ t('nav.overview') }}
-          </router-link>
-          <router-link to="/inventory" :class="{ active: $route.path === '/inventory' }">
-            {{ t('nav.inventory') }}
-          </router-link>
-          <router-link to="/orders" :class="{ active: $route.path === '/orders' }">
-            {{ t('nav.orders') }}
-          </router-link>
-          <router-link to="/spending" :class="{ active: $route.path === '/spending' }">
-            {{ t('nav.finance') }}
-          </router-link>
-          <router-link to="/demand" :class="{ active: $route.path === '/demand' }">
-            {{ t('nav.demandForecast') }}
-          </router-link>
-          <router-link to="/reports" :class="{ active: $route.path === '/reports' }">
-            Reports
-          </router-link>
-        </nav>
+        <button class="sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed">
+          {{ sidebarCollapsed ? '»' : '«' }}
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <router-link
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :exact="item.path === '/'"
+          :title="sidebarCollapsed ? (item.labelKey ? t(item.labelKey) : (item.path === '/reports' ? 'Reports' : 'Backlog')) : null"
+        >
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-label">
+            {{ item.labelKey ? t(item.labelKey) : (item.path === '/reports' ? 'Reports' : 'Backlog') }}
+          </span>
+        </router-link>
+      </nav>
+
+      <div class="sidebar-footer">
         <LanguageSwitcher />
         <ProfileMenu
           @show-profile-details="showProfileDetails = true"
           @show-tasks="showTasks = true"
         />
       </div>
-    </header>
-    <FilterBar />
-    <main class="main-content">
-      <router-view />
-    </main>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-bar">
+        <button class="mobile-menu-btn" @click="sidebarCollapsed = false">&#9776;</button>
+        <FilterBar />
+      </header>
+      <main class="main-content">
+        <router-view />
+      </main>
+    </div>
 
     <ProfileDetailsModal
       :is-open="showProfileDetails"
@@ -55,7 +63,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { api } from './api'
 import { useAuth } from './composables/useAuth'
 import { useI18n } from './composables/useI18n'
@@ -80,6 +88,34 @@ export default {
     const showProfileDetails = ref(false)
     const showTasks = ref(false)
     const apiTasks = ref([])
+    const sidebarCollapsed = ref(false)
+
+    // Collapse sidebar automatically on small screens
+    const mediaQuery = window.matchMedia('(max-width: 1024px)')
+
+    const handleMediaChange = (e) => {
+      sidebarCollapsed.value = e.matches
+    }
+
+    // Set initial state based on current viewport
+    sidebarCollapsed.value = mediaQuery.matches
+
+    // Listen for future changes
+    mediaQuery.addEventListener('change', handleMediaChange)
+
+    onUnmounted(() => {
+      mediaQuery.removeEventListener('change', handleMediaChange)
+    })
+
+    const navItems = [
+      { path: '/',          icon: '◉', labelKey: 'nav.overview' },
+      { path: '/inventory', icon: '▦', labelKey: 'nav.inventory' },
+      { path: '/orders',    icon: '◈', labelKey: 'nav.orders' },
+      { path: '/spending',  icon: '◇', labelKey: 'nav.finance' },
+      { path: '/demand',    icon: '◎', labelKey: 'nav.demandForecast' },
+      { path: '/reports',   icon: '◫', labelKey: null },
+      { path: '/backlog',   icon: '⚠', labelKey: null },
+    ]
 
     // Merge mock tasks from currentUser with API tasks
     const tasks = computed(() => {
@@ -155,7 +191,9 @@ export default {
       tasks,
       addTask,
       deleteTask,
-      toggleTask
+      toggleTask,
+      sidebarCollapsed,
+      navItems
     }
   }
 }
@@ -176,104 +214,232 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-.app {
+/* ── Shell ── */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: #0f172a;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-}
-
-.top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  position: sticky;
-  top: 0;
+  transition: width 0.2s ease, min-width 0.2s ease;
+  overflow: hidden;
   z-index: 100;
+  flex-shrink: 0;
 }
 
-.nav-container {
-  max-width: 1600px;
-  margin: 0 auto;
+.sidebar-collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+.sidebar-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  height: 64px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
   display: flex;
   align-items: center;
-  padding: 0 2rem;
-  height: 70px;
-}
-
-.nav-container > .nav-tabs {
-  margin-left: auto;
-  margin-right: 1rem;
-}
-
-.nav-container > .language-switcher {
-  margin-right: 1rem;
-}
-
-.logo {
-  display: flex;
-  align-items: baseline;
   gap: 0.75rem;
+  overflow: hidden;
 }
 
-.logo h1 {
-  font-size: 1.375rem;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.025em;
-}
-
-.subtitle {
-  font-size: 0.813rem;
-  color: #64748b;
-  font-weight: 400;
-  padding-left: 0.75rem;
-  border-left: 1px solid #e2e8f0;
-}
-
-.nav-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.nav-tabs a {
-  padding: 0.625rem 1.25rem;
-  color: #64748b;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.938rem;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.nav-tabs a:hover {
-  color: #0f172a;
-  background: #f1f5f9;
-}
-
-.nav-tabs a.active {
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-.nav-tabs a.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
+.logo-mark {
+  width: 28px;
+  height: 28px;
   background: #2563eb;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 6px;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  border-left: 2px solid transparent;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+}
+
+.nav-item.router-link-active,
+.nav-item.router-link-exact-active {
+  background: rgba(37, 99, 235, 0.15);
+  color: #f1f5f9;
+  border-left-color: #2563eb;
+}
+
+.nav-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-footer {
+  padding: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+.sidebar-collapsed .logo-text {
+  display: none;
+}
+
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 0.625rem;
+}
+
+/* ── Main wrapper ── */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.top-bar {
+  height: 56px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .main-content {
   flex: 1;
-  max-width: 1600px;
-  width: 100%;
-  margin: 0 auto;
+  overflow-y: auto;
   padding: 1.5rem 2rem;
 }
 
+/* ── Mobile menu button ── */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  margin-right: 0.75rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.mobile-menu-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transition: width 0.2s ease, min-width 0.2s ease, transform 0.2s ease;
+  }
+
+  .sidebar-collapsed {
+    transform: translateX(-100%);
+    /* On mobile, collapsed = fully hidden, not icon-rail */
+    width: 240px;
+    min-width: 240px;
+  }
+
+  .main-wrapper {
+    /* Take full width on mobile since sidebar is overlaid */
+    width: 100%;
+  }
+}
+
+/* ── Page structure ── */
 .page-header {
   margin-bottom: 1.5rem;
 }
